@@ -1,71 +1,87 @@
 import fetch from "node-fetch";
 
 // ---------- CONFIG ----------
-const PHOTON_API_KEY = process.env.PHOTON_API_KEY;
+const API_URL = process.env.API_URL; // your API that returns { players, rooms }
 const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const CHECK_INTERVAL = 60 * 1000; // check every 60 seconds
 
 // ---------- VALIDATE ENV ----------
-if (!PHOTON_API_KEY || !WEBHOOK_URL) {
-  console.error("❌ Missing PHOTON_API_KEY or DISCORD_WEBHOOK_URL environment variable!");
+if (!API_URL || !WEBHOOK_URL) {
+  console.error("❌ Missing API_URL or DISCORD_WEBHOOK_URL environment variable!");
   process.exit(1);
 }
 
 // ---------- STATE ----------
-let lastCCU = null; // last known CCU
+let lastPlayers = null; // to track changes
+let lastRooms = null;
 
-// ---------- FETCH CURRENT CCU ----------
-async function fetchCCU() {
+// ---------- ROLE MENTIONS ----------
+function getPing(players) {
+  if (players === 5) return "<@&ROLE_ID_5>";   // replace ROLE_ID_5 with your Discord role ID
+  if (players === 8) return "<@&ROLE_ID_8>";   // replace ROLE_ID_8
+  if (players === 10) return "<@&ROLE_ID_10>"; // replace ROLE_ID_10
+  if (players === 16) return "<@&ROLE_ID_16>"; // replace ROLE_ID_16
+  return null;
+}
+
+// ---------- FETCH API ----------
+async function fetchGameStats() {
   try {
-    const res = await fetch(`https://api.photonengine.com/your_game_id/ccu?apikey=${PHOTON_API_KEY}`);
+    const res = await fetch(API_URL);
     const data = await res.json();
 
-    // Adjust this according to Photon API response format
-    const ccu = data?.ccu ?? null;
-    if (ccu === null) throw new Error("CCU not found in response");
+    const players = data?.players ?? null;
+    const rooms = data?.rooms ?? null;
 
-    return ccu;
+    if (players === null || rooms === null) throw new Error("API missing players or rooms");
+
+    return { players, rooms };
   } catch (err) {
-    console.error("❌ Error fetching CCU:", err.message);
+    console.error("❌ Error fetching API:", err.message);
     return null;
   }
 }
 
 // ---------- SEND DISCORD WEBHOOK ----------
-async function sendWebhook(ccu) {
+async function sendWebhook(players, rooms, ping) {
   try {
     await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        content: ping ?? "", // ping role if available
         embeds: [{
-          title: "📊 Current CCU Update",
-          description: `Current online players: **${ccu}**`,
+          title: "🎮 Game Stats Update",
+          description: `Players online: **${players}**\nRooms active: **${rooms}**`,
           color: 0x00ff99,
           timestamp: new Date().toISOString()
         }]
       })
     });
-    console.log(`✅ Sent CCU update: ${ccu}`);
+    console.log(`✅ Sent update: ${players} players, ${rooms} rooms`);
   } catch (err) {
     console.error("❌ Error sending webhook:", err.message);
   }
 }
 
 // ---------- CHECK AND NOTIFY ----------
-async function checkCCU() {
-  const ccu = await fetchCCU();
-  if (ccu === null) return;
+async function checkStats() {
+  const stats = await fetchGameStats();
+  if (!stats) return;
 
-  // Send webhook only if CCU changed
-  if (ccu !== lastCCU) {
-    lastCCU = ccu;
-    await sendWebhook(ccu);
+  const { players, rooms } = stats;
+  const ping = getPing(players);
+
+  // Send webhook only if players or rooms changed
+  if (players !== lastPlayers || rooms !== lastRooms) {
+    lastPlayers = players;
+    lastRooms = rooms;
+    await sendWebhook(players, rooms, ping);
   }
 }
 
 // ---------- RUN INTERVAL ----------
-setInterval(checkCCU, CHECK_INTERVAL);
+setInterval(checkStats, CHECK_INTERVAL);
 
 // ---------- RUN ON STARTUP ----------
-checkCCU();
+checkStats();
