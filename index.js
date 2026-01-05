@@ -35,7 +35,7 @@ function getPingForCount(count) {
   return null;
 }
 
-async function sendDiscordMessage(content, playerCount) {
+async function sendDiscordMessage(content, playerCount, roomCount) {
   try {
     await fetch(DISCORD_WEBHOOK_URL, {
       method: "POST",
@@ -44,13 +44,16 @@ async function sendDiscordMessage(content, playerCount) {
         content: content,
         embeds: [{
           title: "🎮 Server Activity",
-          description: `👥 Players Online: **${playerCount}**`,
+          description: `👥 Players Online: **${playerCount}**\n🧩 Active Rooms: **${roomCount}**`,
           color: playerCount >= 16 ? 0xff0000 : 0x00ff99,
           timestamp: new Date().toISOString()
-        }]
+        }],
+        allowed_mentions: {
+          parse: ["roles"] // ensure roles actually ping
+        }
       })
     });
-    console.log(`📢 Discord updated: ${playerCount} players`);
+    console.log(`📢 Discord updated: ${playerCount} players, ${roomCount} rooms`);
   } catch (err) {
     console.error("❌ Error sending Discord message:", err.message);
   }
@@ -63,6 +66,7 @@ async function checkPlayerCount() {
     const data = await res.json();
 
     const playerCount = data.players;
+    const roomCount = data.rooms;
 
     if (playerCount !== lastPlayerCount) {
       lastPlayerCount = playerCount;
@@ -81,7 +85,7 @@ async function checkPlayerCount() {
         if (playerCount < t) pingedThresholds.delete(t);
       });
 
-      await sendDiscordMessage(pingContent, playerCount);
+      await sendDiscordMessage(pingContent, playerCount, roomCount);
     }
   } catch (err) {
     console.error("❌ Error fetching player count:", err.message);
