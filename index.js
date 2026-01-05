@@ -8,77 +8,81 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
-// ---------- VALIDATE ----------
 if (!DISCORD_WEBHOOK_URL) {
   console.error("❌ Missing DISCORD_WEBHOOK_URL");
   process.exit(1);
 }
 
 // ---------- STATE ----------
-let currentPlayers = new Set();
-let currentRooms = new Set();
-let lastCCU = 0;
+const players = new Set();
+const rooms = new Set();
+let lastCCU = -1;
 
-// ---------- ROLE MENTIONS ----------
+// ---------- ROLE PINGS ----------
 function getRolePing(ccu) {
-  if (ccu >= 16) return "@16playersFULLROOM";
-  if (ccu >= 10) return "@10players";
-  if (ccu >= 8) return "@8players";
-  if (ccu >= 5) return "@5players";
-  return null;
+  if (ccu >= 16) return "<@&16playersFULLROOM>";
+  if (ccu >= 10) return "<@&10players>";
+  if (ccu >= 8) return "<@&8players>";
+  if (ccu >= 5) return "<@&5players>";
+  return "";
 }
 
-// ---------- DISCORD WEBHOOK ----------
+// ---------- DISCORD ----------
 async function sendDiscordUpdate() {
-  const ccu = currentPlayers.size;
-  const rooms = currentRooms.size;
+  const ccu = players.size;
+  const roomCount = rooms.size;
 
   if (ccu === lastCCU) return;
   lastCCU = ccu;
-
-  const rolePing = getRolePing(ccu);
 
   await fetch(DISCORD_WEBHOOK_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      content: rolePing || "",
+      content: getRolePing(ccu),
       embeds: [{
-        title: "🎮 Server Activity Update",
+        title: "🎮 Server Activity",
         description:
           `👥 Players Online: **${ccu}**\n` +
-          `🧩 Active Rooms: **${rooms}**`,
+          `🧩 Active Rooms: **${roomCount}**`,
         color: ccu >= 16 ? 0xff0000 : 0x00ff99,
         timestamp: new Date().toISOString()
       }]
     })
   });
 
-  console.log(`✅ CCU updated → ${ccu} players, ${rooms} rooms`);
+  console.log(`📢 Discord updated: ${ccu} players`);
 }
 
 // ---------- PHOTON WEBHOOK ----------
 app.post("/photon/webhook", async (req, res) => {
-  const { Event, UserId, RoomId } = req.body;
+  const { Type, Body } = req.body;
 
-  console.log("📡 Photon event:", Event, UserId, RoomId);
+  if (!Type || !Body) {
+    return res.sendStatus(400);
+  }
 
-  switch (Event) {
+  const userId = Body.UserId;
+  const roomId = Body.GameId;
+
+  console.log(`📡 Photon: ${Type}`, userId, roomId);
+
+  switch (Type) {
     case "Join":
-      if (UserId) currentPlayers.add(UserId);
-      if (RoomId) currentRooms.add(RoomId);
+      if (userId) players.add(userId);
+      if (roomId) rooms.add(roomId);
       break;
 
     case "Leave":
-      if (UserId) currentPlayers.delete(UserId);
+      if (userId) players.delete(userId);
       break;
 
     case "CreateGame":
-      if (RoomId) currentRooms.add(RoomId);
+      if (roomId) rooms.add(roomId);
       break;
 
     case "CloseGame":
-      if (RoomId) currentRooms.delete(RoomId);
+      if (roomId) rooms.delete(roomId);
       break;
   }
 
@@ -86,12 +90,12 @@ app.post("/photon/webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-// ---------- HEALTH CHECK ----------
-app.get("/", (req, res) => {
+// ---------- HEALTH ----------
+app.get("/", (_, res) => {
   res.send("✅ Photon Webhook Bot Running");
 });
 
 // ---------- START ----------
 app.listen(PORT, () => {
-  console.log(`🚀 Server listening on port ${PORT}`);
+  console.log(`🚀 Listening on port ${PORT}`);
 });
