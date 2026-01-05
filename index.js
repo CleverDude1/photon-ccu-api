@@ -21,10 +21,10 @@ const pingedThresholds = new Set();
 // Role thresholds
 const thresholds = [5, 8, 10, 16];
 const roleMentions = {
-  5: "<@5players>",
-  8: "<@8players>",
-  10: "<@10players>",
-  16: "<@16playersFULLROOM>"
+  5: "@5players",
+  8: "@8players",
+  10: "@10players",
+  16: "@16playersFULLROOM"
 };
 
 // ---------- HELPERS ----------
