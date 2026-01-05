@@ -1,89 +1,97 @@
+import express from "express";
 import fetch from "node-fetch";
 
-// ---------- CONFIG ----------
-const PHOTON_API_KEY = process.env.PHOTON_API_KEY; // your Photon API key
-const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
-const GAME_ID = process.env.PHOTON_GAME_ID; // your Photon game ID
-const CHECK_INTERVAL = 60 * 1000; // check every 60 seconds
+const app = express();
+app.use(express.json());
 
-// ---------- VALIDATE ENV ----------
-if (!PHOTON_API_KEY || !WEBHOOK_URL || !GAME_ID) {
-  console.error("❌ Missing PHOTON_API_KEY, DISCORD_WEBHOOK_URL, or PHOTON_GAME_ID!");
+// ---------- CONFIG ----------
+const PORT = process.env.PORT || 3000;
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+
+// ---------- VALIDATE ----------
+if (!DISCORD_WEBHOOK_URL) {
+  console.error("❌ Missing DISCORD_WEBHOOK_URL");
   process.exit(1);
 }
 
 // ---------- STATE ----------
-let lastCCU = null; // last known player count
-let lastRooms = null; // optional if you track rooms
+let currentPlayers = new Set();
+let currentRooms = new Set();
+let lastCCU = 0;
 
 // ---------- ROLE MENTIONS ----------
-function getPing(players) {
-  if (players === 5) return "<@5players>";   // replace ROLE_ID_5 with your Discord role ID
-  if (players === 8) return "<@8players>";   // replace ROLE_ID_8
-  if (players === 10) return "<@10players>"; // replace ROLE_ID_10
-  if (players === 16) return "<@16playersFULLROOM>"; // replace ROLE_ID_16 (FULL ROOM)
+function getRolePing(ccu) {
+  if (ccu >= 16) return "@16playersFULLROOM";
+  if (ccu >= 10) return "@10players";
+  if (ccu >= 8) return "@8players";
+  if (ccu >= 5) return "@5players";
   return null;
 }
 
-// ---------- FETCH CCU FROM PHOTON ----------
-async function fetchCCU() {
-  try {
-    const res = await fetch(`https://api.photonengine.com/${GAME_ID}/ccu?apikey=${PHOTON_API_KEY}`);
-    const data = await res.json();
+// ---------- DISCORD WEBHOOK ----------
+async function sendDiscordUpdate() {
+  const ccu = currentPlayers.size;
+  const rooms = currentRooms.size;
 
-    // Adjust according to Photon API response
-    const ccu = data?.ccu ?? null; // total online players
-    const rooms = data?.rooms ?? null; // if your API provides rooms
+  if (ccu === lastCCU) return;
+  lastCCU = ccu;
 
-    if (ccu === null) throw new Error("CCU not found in response");
+  const rolePing = getRolePing(ccu);
 
-    return { players: ccu, rooms };
-  } catch (err) {
-    console.error("❌ Error fetching CCU:", err.message);
-    return null;
-  }
+  await fetch(DISCORD_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: rolePing || "",
+      embeds: [{
+        title: "🎮 Server Activity Update",
+        description:
+          `👥 Players Online: **${ccu}**\n` +
+          `🧩 Active Rooms: **${rooms}**`,
+        color: ccu >= 16 ? 0xff0000 : 0x00ff99,
+        timestamp: new Date().toISOString()
+      }]
+    })
+  });
+
+  console.log(`✅ CCU updated → ${ccu} players, ${rooms} rooms`);
 }
 
-// ---------- SEND DISCORD WEBHOOK ----------
-async function sendWebhook(players, rooms, ping) {
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content: ping ?? "", // ping role if available
-        embeds: [{
-          title: "🎮 Current Game Stats",
-          description: `Players online: **${players}**${rooms !== null ? `\nRooms active: **${rooms}**` : ""}`,
-          color: 0x00ff99,
-          timestamp: new Date().toISOString()
-        }]
-      })
-    });
-    console.log(`✅ Sent update: ${players} players${rooms !== null ? `, ${rooms} rooms` : ""}`);
-  } catch (err) {
-    console.error("❌ Error sending webhook:", err.message);
+// ---------- PHOTON WEBHOOK ----------
+app.post("/photon/webhook", async (req, res) => {
+  const { Event, UserId, RoomId } = req.body;
+
+  console.log("📡 Photon event:", Event, UserId, RoomId);
+
+  switch (Event) {
+    case "Join":
+      if (UserId) currentPlayers.add(UserId);
+      if (RoomId) currentRooms.add(RoomId);
+      break;
+
+    case "Leave":
+      if (UserId) currentPlayers.delete(UserId);
+      break;
+
+    case "CreateGame":
+      if (RoomId) currentRooms.add(RoomId);
+      break;
+
+    case "CloseGame":
+      if (RoomId) currentRooms.delete(RoomId);
+      break;
   }
-}
 
-// ---------- CHECK AND NOTIFY ----------
-async function checkStats() {
-  const stats = await fetchCCU();
-  if (!stats) return;
+  await sendDiscordUpdate();
+  res.sendStatus(200);
+});
 
-  const { players, rooms } = stats;
-  const ping = getPing(players);
+// ---------- HEALTH CHECK ----------
+app.get("/", (req, res) => {
+  res.send("✅ Photon Webhook Bot Running");
+});
 
-  // Send webhook only if players or rooms changed
-  if (players !== lastCCU || rooms !== lastRooms) {
-    lastCCU = players;
-    lastRooms = rooms;
-    await sendWebhook(players, rooms, ping);
-  }
-}
-
-// ---------- RUN INTERVAL ----------
-setInterval(checkStats, CHECK_INTERVAL);
-
-// ---------- RUN ON STARTUP ----------
-checkStats();
+// ---------- START ----------
+app.listen(PORT, () => {
+  console.log(`🚀 Server listening on port ${PORT}`);
+});
