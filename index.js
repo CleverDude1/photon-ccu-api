@@ -18,10 +18,10 @@ let lastRooms = null; // optional if you track rooms
 
 // ---------- ROLE MENTIONS ----------
 function getPing(players) {
-  if (players === 5) return "<@&ROLE_ID_5>";   // replace ROLE_ID_5 with your Discord role ID
-  if (players === 8) return "<@&ROLE_ID_8>";   // replace ROLE_ID_8
-  if (players === 10) return "<@&ROLE_ID_10>"; // replace ROLE_ID_10
-  if (players === 16) return "<@&ROLE_ID_16>"; // replace ROLE_ID_16 (FULL ROOM)
+  if (players === 5) return "<@5players>";   // replace ROLE_ID_5 with your Discord role ID
+  if (players === 8) return "<@8players>";   // replace ROLE_ID_8
+  if (players === 10) return "<@10players>"; // replace ROLE_ID_10
+  if (players === 16) return "<@16playersFULLROOM>"; // replace ROLE_ID_16 (FULL ROOM)
   return null;
 }
 
