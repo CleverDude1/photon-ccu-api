@@ -6,11 +6,11 @@ app.use(express.json());
 
 // ---------- CONFIG ----------
 const PORT = process.env.PORT || 3000;
-const API_URL = process.env.API_URL; // URL to fetch players
+const STATS_URL = process.env.STATS_URL; // URL to fetch players
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
-if (!API_URL || !DISCORD_WEBHOOK_URL) {
-  console.error("❌ Missing API_URL or DISCORD_WEBHOOK_URL");
+if (!STATS_URL || !DISCORD_WEBHOOK_URL) {
+  console.error("❌ Missing STATS_URL or DISCORD_WEBHOOK_URL");
   process.exit(1);
 }
 
@@ -62,7 +62,7 @@ async function sendDiscordMessage(content, playerCount, roomCount) {
 // ---------- MAIN CHECK ----------
 async function checkPlayerCount() {
   try {
-    const res = await fetch(API_URL);
+    const res = await fetch(STATS_URL);
     const data = await res.json();
 
     const playerCount = data.players;
