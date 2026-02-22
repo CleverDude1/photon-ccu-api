@@ -11,6 +11,11 @@ if (!DISCORD_WEBHOOK) {
 
 let seenIds = new Set();
 
+function formatTimestamp(unix) {
+  const date = new Date(Number(unix) * 1000);
+  return date.toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
+
 async function fetchChat() {
   try {
     const res = await fetch(CHAT_URL);
@@ -22,6 +27,7 @@ async function fetchChat() {
       return {
         id: parts[0],
         time: parts[1],
+        formattedTime: formatTimestamp(parts[1]),
         name: parts[2],
         message: parts[3]
       };
@@ -38,7 +44,7 @@ async function sendWebhook(msg) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        content: `**${msg.name}**: ${msg.message} \`(${msg.time})\``
+        content: `**${msg.name}**: ${msg.message} \`(${msg.formattedTime})\``
       })
     });
     console.log(`✅ Sent: ${msg.id} - ${msg.name}`);
