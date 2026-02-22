@@ -1,13 +1,10 @@
 {
-  "name": "photon-ccu-api",
-  "version": "1.0.0",
+  "name": "lobby-chat-discord-bot",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.4.0"
   }
 }
-
