@@ -1,8 +1,6 @@
-
-
 const CHAT_URL = "https://kiskofa2006.serv00.net/games/TRP/lobby_chat.txt";
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-const POLL_INTERVAL = 30 * 1000; // check every 30 seconds
+const POLL_INTERVAL = 30 * 1000;
 
 if (!DISCORD_WEBHOOK) {
   console.error("❌ Missing DISCORD_WEBHOOK_URL!");
@@ -11,7 +9,6 @@ if (!DISCORD_WEBHOOK) {
 
 let seenIds = new Set();
 
-// Convert Unix timestamp (seconds) to readable format
 function formatTimestamp(unix) {
   const date = new Date(parseInt(unix, 10) * 1000);
 
@@ -37,7 +34,6 @@ async function fetchChat() {
     return lines
       .map(line => {
         const parts = line.split("|");
-
         if (parts.length < 4) return null;
 
         return {
@@ -55,12 +51,11 @@ async function fetchChat() {
   }
 }
 
-// Prevent Discord pings
 function sanitizeMessage(message) {
   return message
     .replace(/@everyone/g, "@\u200Beveryone")
     .replace(/@here/g, "@\u200Bhere")
-    .replace(/<@/g, "<@\u200B"); // blocks user & role mentions
+    .replace(/<@/g, "<@\u200B");
 }
 
 async function sendWebhook(msg) {
