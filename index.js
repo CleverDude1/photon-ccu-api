@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+
 
 const CHAT_URL = "https://kiskofa2006.serv00.net/games/TRP/lobby_chat.txt";
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
