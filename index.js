@@ -38,14 +38,13 @@ async function fetchChat() {
       .map(line => {
         const parts = line.split("|");
 
-        // Ensure correct format
         if (parts.length < 4) return null;
 
         return {
           id: parts[0].trim(),
           time: parts[1].trim(),
           name: parts[2].trim(),
-          message: parts.slice(3).join("|").trim(), // in case message contains |
+          message: parts.slice(3).join("|").trim()
         };
       })
       .filter(Boolean);
@@ -56,15 +55,25 @@ async function fetchChat() {
   }
 }
 
+// Prevent Discord pings
+function sanitizeMessage(message) {
+  return message
+    .replace(/@everyone/g, "@\u200Beveryone")
+    .replace(/@here/g, "@\u200Bhere")
+    .replace(/<@/g, "<@\u200B"); // blocks user & role mentions
+}
+
 async function sendWebhook(msg) {
   try {
     const readableTime = formatTimestamp(msg.time);
+    const safeMessage = sanitizeMessage(msg.message);
 
     await fetch(DISCORD_WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        content: `🆔 **#${msg.id}** | **${msg.name}**: ${msg.message}\n🕒 ${readableTime}`
+        content: `🆔 **#${msg.id}** | **${msg.name}**: ${safeMessage}\n🕒 ${readableTime}`,
+        allowed_mentions: { parse: [] }
       })
     });
 
