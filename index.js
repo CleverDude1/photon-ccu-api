@@ -34,7 +34,8 @@ function sanitizeMessage(message) {
   return message
     .replace(/@everyone/g, "@\u200Beveryone")
     .replace(/@here/g, "@\u200Bhere")
-    .replace(/<@/g, "<@\u200B"); // blocks user & role mentions
+    .replace(/<@/g, "<@\u200B") // blocks user & role mentions
+    .replace(/https?:\/\//gi, (match) => match.replace("://", ":\u200B//")); // breaks clickable URLs
 }
 
 async function sendWebhook(msg) {
